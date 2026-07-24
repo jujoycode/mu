@@ -16,6 +16,8 @@
 - `src/agent.ts` — 코어 루프. **~150줄 유지 목표.** 이 파일이 커지면 설계가 잘못된 것
 - `src/llm.ts` — Anthropic 스트리밍 래퍼 (프로바이더는 당분간 1개)
 - `src/tools/` — 툴 구현. 인터페이스는 `{ name, description, inputSchema, execute }`로 고정
+- `src/session.ts` — 세션 저장 (선형 JSONL append, `~/.mu/sessions/`)
+- `src/gate.ts` + `policy.json` — allow/ask/deny 권한 게이트. 정책은 설정 파일에 (코드 금지)
 - `MU.md` — **mu 런타임이 소비하는 시스템 프롬프트.** 이 CLAUDE.md와 다른 파일이니 혼동 금지
 
 ## 절대 규칙

@@ -1,6 +1,6 @@
 # 04. 로드맵
 
-## P0 — 코어 루프 (1–2주) ← 현재 단계
+## P0 — 코어 루프 (1–2주) — 구현 완료
 
 - 스트리밍 LLM 클라이언트 (Anthropic 단일 프로바이더)
 - 툴콜 루프 + 기본 도구 4개 (read / write / edit / bash)
@@ -14,10 +14,11 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 > (bash 테스트 → read → edit → bash 재검증 → diff, 5턴).
 > 실모델 + 실레포 검증은 API 키 있는 환경에서 남음.
 
-## P1 — 신뢰성 + remote_exec
+## P1 — 신뢰성 + remote_exec ← 현재 단계
 
-- 세션 저장/재개 (messages 배열 JSON 덤프)
-- bash 안전장치 — allow/ask/deny 권한 게이트 (설계: docs/05)
+- ✅ 세션 저장/재개 — 선형 JSONL append (docs/06 결정 4), `mu -c`로 재개
+- ✅ bash 안전장치 — allow/ask/deny 권한 게이트 + 감사 로그 (설계: docs/05,
+  정책: policy.json + ~/.mu/policy.json add-only 병합)
 - TUI 코어 이식 + ask 프롬프트 UI (설계: docs/07)
 - 재시도·에러 처리, 토큰/비용 추적
 - **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김

@@ -12,17 +12,29 @@ export interface AgentOptions {
 	tools: Tool[];
 	maxTokens?: number;
 	onEvent?: OnEvent;
-	// 권한 게이트 자리 (P1): 실행 전 판정. false를 반환하면 실행하지 않는다.
+	// 메시지가 배열에 추가될 때마다 호출 — 세션 저장(JSONL append)이 여기 꽂힌다
+	onMessage?: (message: Message) => void;
+	// 권한 게이트 (P1, 설계: docs/05): 실행 전 판정. false를 반환하면 실행하지 않는다.
 	beforeToolCall?: (toolCall: ToolCall) => Promise<{ allow: boolean; reason?: string }>;
 }
 
 export class Agent {
-	readonly messages: Message[] = [];
+	readonly messages: Message[];
 
-	constructor(private readonly options: AgentOptions) {}
+	constructor(
+		private readonly options: AgentOptions,
+		initialMessages: Message[] = [],
+	) {
+		this.messages = [...initialMessages];
+	}
+
+	private push(message: Message): void {
+		this.messages.push(message);
+		this.options.onMessage?.(message);
+	}
 
 	async run(userText: string, signal?: AbortSignal): Promise<void> {
-		this.messages.push({ role: "user", content: userText });
+		this.push({ role: "user", content: userText });
 
 		while (true) {
 			const assistant = await streamAssistant({
@@ -34,7 +46,7 @@ export class Agent {
 				signal,
 				onEvent: this.options.onEvent,
 			});
-			this.messages.push(assistant);
+			this.push(assistant);
 			this.options.onEvent?.({ type: "assistant_end", message: assistant });
 
 			if (assistant.stopReason === "error" || assistant.stopReason === "aborted") return;
@@ -60,7 +72,7 @@ export class Agent {
 					content: result.content,
 					isError: result.isError,
 				};
-				this.messages.push(message);
+				this.push(message);
 				this.options.onEvent?.({ type: "tool_end", toolCall, result });
 				if (signal?.aborted) return;
 			}

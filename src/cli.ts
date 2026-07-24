@@ -1,9 +1,16 @@
 #!/usr/bin/env bun
-// 진입점 + 최소 REPL (P0). TUI 폴리시는 docs/07 방향에 따라 이후 단계에서.
+// 진입점 + 최소 REPL (P0~P1). TUI 폴리시는 docs/07 방향에 따라 이후 단계에서.
+//
+// 사용법:
+//   mu                # REPL
+//   mu -c             # 최근 세션 이어서 REPL
+//   mu -p "task"      # 원샷 (비대화형 — ask 게이트는 자동 차단)
 
 import { existsSync, readFileSync } from "node:fs";
-import { createInterface } from "node:readline";
+import { createInterface, type Interface } from "node:readline";
 import { Agent } from "./agent.ts";
+import { type AskDecision, createGate, loadPolicy } from "./gate.ts";
+import { SessionStore } from "./session.ts";
 import { createCoreTools } from "./tools/index.ts";
 import type { AgentEvent, ToolCall } from "./types.ts";
 
@@ -23,6 +30,7 @@ function loadSystemPrompt(): string {
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
+const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
 function summarizeToolCall(toolCall: ToolCall): string {
 	const a = toolCall.arguments as Record<string, unknown>;
@@ -66,34 +74,69 @@ function makeOnEvent(): (event: AgentEvent) => void {
 	};
 }
 
+// ask 프롬프트 (P1 임시 — TUI 셀렉터는 docs/07대로 이후 교체)
+function makeConfirm(rl: Interface): (summary: string, pattern: string) => Promise<AskDecision> {
+	return (summary, pattern) =>
+		new Promise((resolve) => {
+			console.log(`\n${yellow("⚠ Permission required")}`);
+			console.log(`  ${summary}`);
+			console.log(dim(`  matches policy pattern: ${pattern}`));
+			rl.question("  [y] allow once  [a] allow for this session  [N] deny > ", (answer) => {
+				const a = answer.trim().toLowerCase();
+				resolve(a === "y" ? "once" : a === "a" ? "session" : "deny");
+			});
+		});
+}
+
 async function main(): Promise<void> {
 	if (!process.env.ANTHROPIC_API_KEY) {
 		console.error("mu: ANTHROPIC_API_KEY is not set");
 		process.exit(1);
 	}
 
-	const agent = new Agent({
-		model: MODEL,
-		systemPrompt: loadSystemPrompt(),
-		tools: createCoreTools(process.cwd()),
-		onEvent: makeOnEvent(),
+	const argv = process.argv.filter((a) => a !== "-c" && a !== "--continue");
+	const continueSession = argv.length !== process.argv.length;
+	const pIndex = argv.indexOf("-p");
+	const oneShot = pIndex !== -1;
+
+	// 세션: 항상 저장. -c면 이 cwd의 최근 세션에 이어서.
+	const resumed = continueSession ? SessionStore.loadLatest(process.cwd()) : undefined;
+	const session = resumed ?? SessionStore.create(process.cwd(), MODEL);
+
+	// 권한 게이트 — REPL에서만 대화형 confirm이 연결된다
+	let confirmImpl: ((summary: string, pattern: string) => Promise<AskDecision>) | undefined;
+	const gate = createGate({
+		policy: loadPolicy(),
+		interactive: !oneShot,
+		confirm: (summary, pattern) => (confirmImpl ? confirmImpl(summary, pattern) : Promise.resolve("deny")),
 	});
 
-	// 원샷 모드: mu -p "task"
-	const pIndex = process.argv.indexOf("-p");
-	if (pIndex !== -1) {
-		const prompt = process.argv.slice(pIndex + 1).join(" ");
+	const agent = new Agent(
+		{
+			model: MODEL,
+			systemPrompt: loadSystemPrompt(),
+			tools: createCoreTools(process.cwd()),
+			onEvent: makeOnEvent(),
+			onMessage: (message) => session.append(message),
+			beforeToolCall: gate,
+		},
+		resumed ? [...resumed.messages] : [],
+	);
+
+	if (oneShot) {
+		const prompt = argv.slice(pIndex + 1).join(" ");
 		if (!prompt) {
-			console.error('mu: usage: mu -p "task"');
+			console.error('mu: usage: mu [-c] [-p "task"]');
 			process.exit(1);
 		}
 		await agent.run(prompt);
 		return;
 	}
 
-	// REPL 모드
 	console.log(dim(`mu · ${MODEL} · ${process.cwd()}`));
+	console.log(dim(`session: ${session.filePath}${resumed ? ` (resumed ${resumed.messages.length} messages)` : ""}`));
 	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	confirmImpl = makeConfirm(rl);
 	let abortController: AbortController | undefined;
 
 	process.on("SIGINT", () => {
@@ -109,7 +152,7 @@ async function main(): Promise<void> {
 	const ask = (): void => {
 		rl.question(`\n${bold("mu>")} `, async (line) => {
 			const input = line.trim();
-			if (input === "" ) return ask();
+			if (input === "") return ask();
 			if (input === "/quit" || input === "exit") return rl.close();
 			abortController = new AbortController();
 			try {
