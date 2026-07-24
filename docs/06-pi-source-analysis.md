@@ -100,8 +100,16 @@ pi 방식의 장점: 스키마 검증 실패, 툴 미발견, 예상 못 한 런�
 4. usage 캡처 (2지점 합산 — Anthropic은 `total_tokens`를 안 줌)
 5. stop_reason 매핑: `end_turn/max_tokens/tool_use/refusal` 4종이면 충분
 
-**단, 자체 SSE 파서는 재구현하지 않는다.** mu는 SDK의 `client.messages.stream()`을
-그대로 쓰면 pi의 SSE/재시도 코드 전체가 불필요. SDK 기본 재시도로 충분.
+**SSE 소비와 재시도는 pi 방식을 그대로 따른다.** pi가 SDK 스트리밍 헬퍼를 버린
+이유(내장 재시도가 AbortSignal을 무시 → 취소해도 백오프 타이머가 계속 돎)는
+단일 프로바이더인 mu에도 그대로 해당된다. 따라서:
+- `client.messages.create({stream: true}, {maxRetries: 0}).asResponse()`로 raw Response
+- 자체 SSE 라인 파싱 (pi `anthropic-messages.ts:295-444` 참조)
+- abortable 백오프 재시도 (pi `provider-retry.ts` 참조 — `retry-after` 헤더 우선,
+  없으면 지수 백오프 + jitter, 408/409/429/5xx 대상)
+- `message_start`는 봤는데 `message_stop` 없이 끝나면 잘린 스트림으로 판정해 재시도
+
+단일 프로바이더이므로 pi의 해당 코드(~300줄)보다 작게 유지할 수 있다.
 
 ### 통째로 스킵할 것
 
@@ -262,4 +270,7 @@ mu 초기엔 확장 시스템 자체가 불필요하다 (스킬 = 데이터로 �
 5. **compaction을 P1 백로그에 등재** — 최소 버전으로
 6. **`EventStream`(89줄) 이식** — 스트리밍 이벤트 프리미티브
 7. **툴 description/에러 문구는 pi 것을 차용** — 프롬프트 엔지니어링 자산
-8. **LLM 레이어는 SDK `client.messages.stream()` 사용** — 자체 SSE/재시도 재구현 금지
+8. **LLM 레이어는 pi와 동일하게 자체 SSE 파싱 + abortable 재시도** — SDK 내장
+   재시도가 AbortSignal을 무시하는 문제는 mu에도 해당 (`maxRetries: 0` + raw Response)
+9. **권한 게이트를 3레벨(allow/ask/deny)로 정식 설계** — bash·remote_exec 공통,
+   `beforeToolCall` 단일 지점 (설계: docs/05)

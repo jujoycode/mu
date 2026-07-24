@@ -12,7 +12,7 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 ## P1 — 신뢰성 + remote_exec
 
 - 세션 저장/재개 (messages 배열 JSON 덤프)
-- bash 안전장치 (위험 명령 권한 게이트)
+- bash 안전장치 — allow/ask/deny 권한 게이트 (설계: docs/05)
 - 재시도·에러 처리, 토큰/비용 추적
 - **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김
 
