@@ -45,3 +45,4 @@ Pi가 "범용 확장 생태계"라면, mu는 **우리 팀 전용 도구**에 집
 | 04 | roadmap | P0–P3 로드맵, 완료 조건 |
 | 05 | design-notes | 권한 게이트 / remote_exec / 스킬 시스템 세부 설계 초안 |
 | 06 | pi-source-analysis | pi 소스 분석 — 구현 참조용 아키텍처 레퍼런스 |
+| 07 | tui-design | TUI 디자인 — pi 스타일 채택, ask 프롬프트·서브에이전트 표시 |
