@@ -35,11 +35,15 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 
 ## P2 — 스킬 시스템 (본체)
 
-- git 기반 팀 스킬 레포 + lazy loading (설계: docs/05)
-- `load_skill` 툴, grep 기반 지식 검색 툴
+- ✅ git 기반 팀 스킬 레포 + lazy loading (구현: src/skills/registry.ts) —
+  `.mu/skills/`(프로젝트) + `~/.mu/skills/`(팀 레포) 병합, SKILL.md frontmatter,
+  요약 한 줄만 상시 컨텍스트에 주입
+- ✅ `load_skill` 툴 (본문 온디맨드 로드) + `search_knowledge` 툴 (스킬 레포 grep)
 - 사내 API 호출 툴, 배포·테스트 파이프라인 연동 등 "팀 전용" 도구 확충
+  — 팀 API/파이프라인 스펙 필요, 도그푸딩하며 추가
 - 서브에이전트 (확장 레이어, 코어 비침습) + 진행 표시 TUI (설계: docs/07)
-- 팀 코드 컨벤션이 반영된 시스템 프롬프트 정비
+  — 다음 큰 항목
+- ✅ 팀 컨벤션 스킬 예시(.mu/skills/mu-dev) — 시스템 프롬프트에 스킬 사용 지침 반영(MU.md)
 
 ## P3 — 도그푸딩 (폴리시 대신)
 

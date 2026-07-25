@@ -84,13 +84,19 @@ pi에는 권한 시스템이 없다 (컨테이너 위임) — 이것이 mu 고�
 Claude Code도 bash로 ssh를 칠 수 있지만, 호스트 레지스트리·환경 정책·감사라는
 개념 자체가 없다. 이것이 mu가 존재하는 이유 중 절반.
 
-## 스킬 시스템 (P2)
+## 스킬 시스템 (P2) — 구현 완료
+
+> 구현: `src/skills/registry.ts`(탐색·frontmatter·lazy 요약) +
+> `src/tools/loadSkill.ts` + `src/tools/searchKnowledge.ts`.
+> 탐색: `.mu/skills/`(프로젝트, cwd) + `~/.mu/skills/`(팀 레포, MU_SKILLS_DIR 오버라이드).
+> 같은 이름은 프로젝트 우선. 요약 한 줄만 시스템 프롬프트에 주입(cli.ts).
 
 ### 구조
 
 - 스킬 = **팀 git 레포의 폴더** (`SKILL.md` + 선택적 스크립트)
 - 배포 = `git pull`. 품질 관리 = PR 리뷰
-- 런북·아키텍처 문서도 같은 레포에 두고 grep 검색 툴로 접근
+- 런북·아키텍처 문서도 같은 레포에 두고 `search_knowledge`(grep) 툴로 접근
+- 예시 스킬: `.mu/skills/mu-dev/SKILL.md` (mu 자체 개발 규칙 — 도그푸딩 겸 포맷 레퍼런스)
 
 ### Lazy loading (Pi의 lazy skills 패턴)
 
