@@ -22,6 +22,8 @@
   env(dev/staging/prod)→레벨은 gate.ts가 판정. SSH 인증은 로컬 ssh-agent + ~/.ssh/config (설계: docs/05)
 - `src/skills/` + `src/tools/{loadSkill,searchKnowledge}.ts` — 스킬 시스템. lazy loading:
   요약만 상주, 본문은 load_skill로 온디맨드. 스킬 = `.mu/skills/`·`~/.mu/skills/`의 폴더 (설계: docs/05)
+- `src/tools/subagent.ts` — 서브에이전트. **코어 비침습**: 내부에서 Agent 인스턴스를 새로
+  만들 뿐 코어 루프는 그대로. 재귀 금지(subagent 툴 미제공), 읽기 중심 툴셋, 비대화형 게이트 (설계: docs/07)
 - `src/components/`, `src/utils/`, `src/constants/` — TUI(Ink). **폴더 구조는 Claude Code와 동일**하게 간다
   (`components/permissions/` ask UI, `components/CustomSelect/`, `components/Spinner.tsx`,
   `components/LogoV2/` 마스코트·웰컴, `utils/theme.ts`). 설계: docs/08·09
