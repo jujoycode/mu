@@ -13,6 +13,7 @@ import { askUser } from "./components/permissions/PermissionRequest.tsx";
 import { createSpinner, type Spinner } from "./components/Spinner.tsx";
 import { printWelcome } from "./components/LogoV2/Welcome.ts";
 import { pickVerb } from "./constants/spinnerVerbs.ts";
+import { CostTracker, computeCost, formatCost, formatTokens, totalTokens } from "./utils/cost.ts";
 import { type AskAnswer, createGate, loadPolicy } from "./gate.ts";
 import { SessionStore } from "./session.ts";
 import { createCoreTools } from "./tools/index.ts";
@@ -60,7 +61,11 @@ function makeSpinnerController(): { begin(): void; end(): void } {
 	};
 }
 
-function makeOnEvent(spin: { begin(): void; end(): void }): (event: AgentEvent) => void {
+function makeOnEvent(
+	spin: { begin(): void; end(): void },
+	cost: CostTracker,
+	model: string,
+): (event: AgentEvent) => void {
 	let inText = false;
 	return (event) => {
 		switch (event.type) {
@@ -92,6 +97,13 @@ function makeOnEvent(spin: { begin(): void; end(): void }): (event: AgentEvent) 
 				}
 				const m = event.message;
 				if (m.errorMessage) console.error(red(`\nerror: ${m.errorMessage}`));
+				// 토큰/비용 추적 (docs/04 P1): 이 턴 usage를 누적하고 세션 총계를 함께 보여준다
+				cost.add(model, m.usage);
+				const turnTokens = totalTokens(m.usage);
+				if (turnTokens > 0) {
+					const turn = `${formatTokens(turnTokens)} tok · ${formatCost(computeCost(model, m.usage))}`;
+					console.log(dim(`  ⎿ ${turn}  ·  session ${cost.summary()}`));
+				}
 				break;
 			}
 		}
@@ -135,12 +147,13 @@ async function main(): Promise<void> {
 	});
 
 	const spin = makeSpinnerController();
+	const cost = new CostTracker();
 	const agent = new Agent(
 		{
 			model: MODEL,
 			systemPrompt: loadSystemPrompt(),
 			tools: createCoreTools(process.cwd()),
-			onEvent: makeOnEvent(spin),
+			onEvent: makeOnEvent(spin, cost, MODEL),
 			onMessage: (message) => session.append(message),
 			beforeToolCall: gate,
 		},
@@ -200,7 +213,10 @@ async function main(): Promise<void> {
 			ask();
 		});
 	};
-	rl.on("close", () => process.exit(0));
+	rl.on("close", () => {
+		if (totalTokens(cost.totalUsage) > 0) console.log(dim(`\n${cost.summary()} this session`));
+		process.exit(0);
+	});
 	ask();
 }
 

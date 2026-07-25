@@ -19,11 +19,12 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 - ✅ 세션 저장/재개 — 선형 JSONL append (docs/06 결정 4), `mu -c`로 재개
 - ✅ bash 안전장치 — allow/ask/deny 권한 게이트 + 감사 로그 (설계: docs/05,
   정책: policy.json + ~/.mu/policy.json add-only 병합)
-- TUI: Ink 도입 + Claude Code 스타일 ask 프롬프트 UI (설계: docs/08, docs/07 일부 개정)
+- ✅ TUI: Ink 도입 + Claude Code 스타일 ask 프롬프트 UI (설계: docs/08, docs/07 일부 개정)
   + 게이트 Decision/Update 모델 개정 (docs/08 PART 1)
-- 재시도·에러 처리, 토큰/비용 추적
-- 브랜드 감성: 스피너 글리프 + 랜덤 멘트, 웰컴 배너 마스코트 (설계: docs/09)
-- **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김
+- ✅ 재시도·에러 처리 (llm.ts: 지수 백오프 + retry-after + abortable, MAX_RETRIES=3)
+  · ✅ 토큰/비용 추적 (src/utils/cost.ts: 모델별 단가 + 캐시 회계, 턴/세션 요약)
+- ✅ 브랜드 감성: 스피너 글리프 + 랜덤 멘트, 웰컴 배너 마스코트 (설계: docs/09)
+- **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김 ← 다음
 
 > 조정 이력: remote_exec P2 → P1.
 > 이유: 매일 아픈 페인포인트라 초기 체감 가치가 가장 큼.
