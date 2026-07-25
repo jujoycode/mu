@@ -7,9 +7,13 @@
 //   mu -p "task"      # 원샷 (비대화형 — ask 게이트는 자동 차단)
 
 import { existsSync, readFileSync } from "node:fs";
-import { createInterface, type Interface } from "node:readline";
+import { createInterface } from "node:readline";
 import { Agent } from "./agent.ts";
-import { type AskDecision, createGate, loadPolicy } from "./gate.ts";
+import { askUser } from "./components/permissions/PermissionRequest.tsx";
+import { createSpinner, type Spinner } from "./components/Spinner.tsx";
+import { printWelcome } from "./components/LogoV2/Welcome.ts";
+import { pickVerb } from "./constants/spinnerVerbs.ts";
+import { type AskAnswer, createGate, loadPolicy } from "./gate.ts";
 import { SessionStore } from "./session.ts";
 import { createCoreTools } from "./tools/index.ts";
 import type { AgentEvent, ToolCall } from "./types.ts";
@@ -30,7 +34,6 @@ function loadSystemPrompt(): string {
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
-const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
 function summarizeToolCall(toolCall: ToolCall): string {
 	const a = toolCall.arguments as Record<string, unknown>;
@@ -40,15 +43,34 @@ function summarizeToolCall(toolCall: ToolCall): string {
 	return `${toolCall.name}(${oneLine.length > 80 ? `${oneLine.slice(0, 80)}…` : oneLine})`;
 }
 
-function makeOnEvent(): (event: AgentEvent) => void {
+// 스피너는 "모델 대기" 구간에만 돈다 — 첫 출력이 오면 멈추고, 툴 실행 후 다음
+// 턴을 기다릴 때 다시 켠다. 멘트는 대기 구간마다 새로 뽑는다 (docs/09).
+function makeSpinnerController(): { begin(): void; end(): void } {
+	let spinner: Spinner | undefined;
+	return {
+		begin() {
+			if (spinner) return;
+			spinner = createSpinner({ verb: pickVerb() });
+			spinner.start();
+		},
+		end() {
+			spinner?.stop();
+			spinner = undefined;
+		},
+	};
+}
+
+function makeOnEvent(spin: { begin(): void; end(): void }): (event: AgentEvent) => void {
 	let inText = false;
 	return (event) => {
 		switch (event.type) {
 			case "text_delta":
+				spin.end();
 				inText = true;
 				process.stdout.write(event.text);
 				break;
 			case "tool_start":
+				spin.end();
 				if (inText) {
 					process.stdout.write("\n");
 					inText = false;
@@ -59,9 +81,11 @@ function makeOnEvent(): (event: AgentEvent) => void {
 				const firstLine = event.result.content.split("\n")[0] ?? "";
 				const preview = firstLine.length > 100 ? `${firstLine.slice(0, 100)}…` : firstLine;
 				console.log(dim(`  ⎿ ${event.result.isError ? red(preview) : preview}`));
+				spin.begin(); // 다음 모델 턴 대기
 				break;
 			}
 			case "assistant_end": {
+				spin.end();
 				if (inText) {
 					process.stdout.write("\n");
 					inText = false;
@@ -74,18 +98,16 @@ function makeOnEvent(): (event: AgentEvent) => void {
 	};
 }
 
-// ask 프롬프트 (P1 임시 — TUI 셀렉터는 docs/07대로 이후 교체)
-function makeConfirm(rl: Interface): (summary: string, pattern: string) => Promise<AskDecision> {
-	return (summary, pattern) =>
-		new Promise((resolve) => {
-			console.log(`\n${yellow("⚠ Permission required")}`);
-			console.log(`  ${summary}`);
-			console.log(dim(`  matches policy pattern: ${pattern}`));
-			rl.question("  [y] allow once  [a] allow for this session  [N] deny > ", (answer) => {
-				const a = answer.trim().toLowerCase();
-				resolve(a === "y" ? "once" : a === "a" ? "session" : "deny");
-			});
-		});
+// ask 프롬프트 — Claude Code 스타일 Ink 다이얼로그 (설계: docs/08 PART 2).
+// summary는 "bash: <command>" 형태 → 제목/부제목으로 쪼갠다.
+function confirmViaDialog(summary: string, pattern: string): Promise<AskAnswer> {
+	const [tool, ...rest] = summary.split(": ");
+	const command = rest.join(": ");
+	return askUser({
+		title: `${tool} 실행 요청`,
+		subtitle: command,
+		pattern,
+	});
 }
 
 async function main(): Promise<void> {
@@ -103,20 +125,22 @@ async function main(): Promise<void> {
 	const resumed = continueSession ? SessionStore.loadLatest(process.cwd()) : undefined;
 	const session = resumed ?? SessionStore.create(process.cwd(), MODEL);
 
-	// 권한 게이트 — REPL에서만 대화형 confirm이 연결된다
-	let confirmImpl: ((summary: string, pattern: string) => Promise<AskDecision>) | undefined;
+	// 권한 게이트 — REPL에서만 대화형 confirm이 연결된다.
+	// Ink 다이얼로그가 stdin을 잡는 동안 readline을 잠시 멈춘다 (stdin 경합 방지).
+	let confirmImpl: ((summary: string, pattern: string) => Promise<AskAnswer>) | undefined;
 	const gate = createGate({
 		policy: loadPolicy(),
 		interactive: !oneShot,
-		confirm: (summary, pattern) => (confirmImpl ? confirmImpl(summary, pattern) : Promise.resolve("deny")),
+		confirm: (summary, pattern) => (confirmImpl ? confirmImpl(summary, pattern) : Promise.resolve({ decision: "deny" })),
 	});
 
+	const spin = makeSpinnerController();
 	const agent = new Agent(
 		{
 			model: MODEL,
 			systemPrompt: loadSystemPrompt(),
 			tools: createCoreTools(process.cwd()),
-			onEvent: makeOnEvent(),
+			onEvent: makeOnEvent(spin),
 			onMessage: (message) => session.append(message),
 			beforeToolCall: gate,
 		},
@@ -133,10 +157,21 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	console.log(dim(`mu · ${MODEL} · ${process.cwd()}`));
-	console.log(dim(`session: ${session.filePath}${resumed ? ` (resumed ${resumed.messages.length} messages)` : ""}`));
+	await printWelcome({
+		model: MODEL,
+		cwd: process.cwd(),
+		sessionLine: `session: ${session.filePath}${resumed ? ` (resumed ${resumed.messages.length} messages)` : ""}`,
+	});
 	const rl = createInterface({ input: process.stdin, output: process.stdout });
-	confirmImpl = makeConfirm(rl);
+	confirmImpl = async (summary, pattern) => {
+		spin.end();
+		rl.pause();
+		try {
+			return await confirmViaDialog(summary, pattern);
+		} finally {
+			rl.resume();
+		}
+	};
 	let abortController: AbortController | undefined;
 
 	process.on("SIGINT", () => {
@@ -155,9 +190,11 @@ async function main(): Promise<void> {
 			if (input === "") return ask();
 			if (input === "/quit" || input === "exit") return rl.close();
 			abortController = new AbortController();
+			spin.begin(); // 첫 모델 응답 대기
 			try {
 				await agent.run(input, abortController.signal);
 			} finally {
+				spin.end();
 				abortController = undefined;
 			}
 			ask();

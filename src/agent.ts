@@ -14,8 +14,9 @@ export interface AgentOptions {
 	onEvent?: OnEvent;
 	// 메시지가 배열에 추가될 때마다 호출 — 세션 저장(JSONL append)이 여기 꽂힌다
 	onMessage?: (message: Message) => void;
-	// 권한 게이트 (P1, 설계: docs/05): 실행 전 판정. false를 반환하면 실행하지 않는다.
-	beforeToolCall?: (toolCall: ToolCall) => Promise<{ allow: boolean; reason?: string }>;
+	// 권한 게이트 (P1, 설계: docs/05·08): 실행 전 판정. false를 반환하면 실행하지 않는다.
+	// allow에 feedback이 실려 오면 툴 결과에 합쳐 모델에게 전달한다 (docs/08 2.3).
+	beforeToolCall?: (toolCall: ToolCall) => Promise<{ allow: boolean; reason?: string; feedback?: string }>;
 }
 
 export class Agent {
@@ -85,11 +86,13 @@ export class Agent {
 		const tool = this.options.tools.find((t) => t.name === toolCall.name);
 		if (!tool) return { content: `Tool ${toolCall.name} not found`, isError: true };
 
+		let feedback: string | undefined;
 		if (this.options.beforeToolCall) {
 			const verdict = await this.options.beforeToolCall(toolCall);
 			if (!verdict.allow) {
 				return { content: verdict.reason ?? "Tool execution was blocked", isError: true };
 			}
+			feedback = verdict.feedback;
 		}
 
 		if (signal?.aborted) return { content: "Operation aborted", isError: true };
@@ -97,7 +100,12 @@ export class Agent {
 		// 방어적 try/catch: 툴의 "throw 금지" 규약이 깨져도 루프는 죽지 않는다.
 		// 실패는 크래시가 아니라 정보다 — 에러 문자열이 모델에게 돌아간다.
 		try {
-			return await tool.execute(toolCall.arguments, signal);
+			const result = await tool.execute(toolCall.arguments, signal);
+			// 승인 시 남긴 피드백(docs/08 2.3)을 결과에 합쳐 모델에게 전달한다
+			if (feedback) {
+				return { ...result, content: `${result.content}\n\n[User feedback: ${feedback}]` };
+			}
+			return result;
 		} catch (e) {
 			return { content: e instanceof Error ? e.message : String(e), isError: true };
 		}

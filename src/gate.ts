@@ -14,11 +14,17 @@ export interface GatePolicy {
 
 export type AskDecision = "once" | "session" | "deny";
 
+// Tab 인라인 피드백 (docs/08 2.3): 허용이면 툴 결과에 합쳐지고, 거부면 거부 사유에 실린다
+export interface AskAnswer {
+	decision: AskDecision;
+	feedback?: string;
+}
+
 export interface GateOptions {
 	policy: GatePolicy;
 	// 비대화형(-p 원샷 등)에서는 ask = 자동 차단 (docs/07)
 	interactive: boolean;
-	confirm?: (summary: string, matchedPattern: string) => Promise<AskDecision>;
+	confirm?: (summary: string, matchedPattern: string) => Promise<AskDecision | AskAnswer>;
 	auditPath?: string; // 기본 ~/.mu/audit.jsonl
 }
 
@@ -55,7 +61,7 @@ export function createGate(options: GateOptions) {
 		}
 	};
 
-	return async (toolCall: ToolCall): Promise<{ allow: boolean; reason?: string }> => {
+	return async (toolCall: ToolCall): Promise<{ allow: boolean; reason?: string; feedback?: string }> => {
 		if (toolCall.name !== "bash") return { allow: true }; // remote_exec 게이트는 P1 후반에 추가
 		const command = String(toolCall.arguments.command ?? "");
 
@@ -77,13 +83,17 @@ export function createGate(options: GateOptions) {
 			};
 		}
 
-		const decision = await options.confirm(`bash: ${command}`, asked);
-		audit({ tool: "bash", command, verdict: "ask", decision, pattern: asked });
+		const answer = await options.confirm(`bash: ${command}`, asked);
+		const { decision, feedback } = typeof answer === "string" ? { decision: answer, feedback: undefined } : answer;
+		audit({ tool: "bash", command, verdict: "ask", decision, pattern: asked, ...(feedback ? { feedback } : {}) });
 		if (decision === "deny") {
-			return { allow: false, reason: "User declined to run this command." };
+			return {
+				allow: false,
+				reason: `User declined to run this command.${feedback ? ` User feedback: ${feedback}` : ""}`,
+			};
 		}
 		if (decision === "session") sessionAllowed.add(asked);
-		return { allow: true };
+		return { allow: true, feedback };
 	};
 }
 

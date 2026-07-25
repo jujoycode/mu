@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_MASCOT, getMascot, MASCOTS } from "../src/tui/mascot";
+import { DEFAULT_MASCOT, getMascot, MASCOTS } from "../src/components/LogoV2/mascot";
 
 afterEach(() => {
 	delete process.env.MU_CONFIG_DIR;
