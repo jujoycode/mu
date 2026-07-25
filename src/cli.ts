@@ -14,9 +14,11 @@ import { createSpinner, type Spinner } from "./components/Spinner.tsx";
 import { printWelcome } from "./components/LogoV2/Welcome.ts";
 import { pickVerb } from "./constants/spinnerVerbs.ts";
 import { CostTracker, computeCost, formatCost, formatTokens, totalTokens } from "./utils/cost.ts";
-import { type AskAnswer, createGate, loadPolicy } from "./gate.ts";
+import { type AskAnswer, type ConfirmRequest, createGate, loadPolicy } from "./gate.ts";
+import { loadHosts } from "./remote/hosts.ts";
 import { SessionStore } from "./session.ts";
 import { createCoreTools } from "./tools/index.ts";
+import { createRemoteExecTool } from "./tools/remoteExec.ts";
 import type { AgentEvent, ToolCall } from "./types.ts";
 
 const MODEL = process.env.MU_MODEL ?? "claude-sonnet-5";
@@ -111,14 +113,14 @@ function makeOnEvent(
 }
 
 // ask 프롬프트 — Claude Code 스타일 Ink 다이얼로그 (설계: docs/08 PART 2).
-// summary는 "bash: <command>" 형태 → 제목/부제목으로 쪼갠다.
-function confirmViaDialog(summary: string, pattern: string): Promise<AskAnswer> {
-	const [tool, ...rest] = summary.split(": ");
-	const command = rest.join(": ");
+// 게이트가 구조화된 ConfirmRequest를 주면 그대로 다이얼로그로 옮긴다.
+function confirmViaDialog(req: ConfirmRequest) {
 	return askUser({
-		title: `${tool} 실행 요청`,
-		subtitle: command,
-		pattern,
+		title: req.title,
+		subtitle: req.detail,
+		pattern: req.pattern,
+		focusNo: req.focusNo,
+		allowSession: req.allowSession,
 	});
 }
 
@@ -139,11 +141,13 @@ async function main(): Promise<void> {
 
 	// 권한 게이트 — REPL에서만 대화형 confirm이 연결된다.
 	// Ink 다이얼로그가 stdin을 잡는 동안 readline을 잠시 멈춘다 (stdin 경합 방지).
-	let confirmImpl: ((summary: string, pattern: string) => Promise<AskAnswer>) | undefined;
+	const hosts = loadHosts();
+	let confirmImpl: ((req: ConfirmRequest) => Promise<AskAnswer>) | undefined;
 	const gate = createGate({
 		policy: loadPolicy(),
 		interactive: !oneShot,
-		confirm: (summary, pattern) => (confirmImpl ? confirmImpl(summary, pattern) : Promise.resolve({ decision: "deny" })),
+		hosts,
+		confirm: (req) => (confirmImpl ? confirmImpl(req) : Promise.resolve({ decision: "deny" })),
 	});
 
 	const spin = makeSpinnerController();
@@ -152,7 +156,7 @@ async function main(): Promise<void> {
 		{
 			model: MODEL,
 			systemPrompt: loadSystemPrompt(),
-			tools: createCoreTools(process.cwd()),
+			tools: [...createCoreTools(process.cwd()), createRemoteExecTool(hosts)],
 			onEvent: makeOnEvent(spin, cost, MODEL),
 			onMessage: (message) => session.append(message),
 			beforeToolCall: gate,
@@ -176,11 +180,11 @@ async function main(): Promise<void> {
 		sessionLine: `session: ${session.filePath}${resumed ? ` (resumed ${resumed.messages.length} messages)` : ""}`,
 	});
 	const rl = createInterface({ input: process.stdin, output: process.stdout });
-	confirmImpl = async (summary, pattern) => {
+	confirmImpl = async (req) => {
 		spin.end();
 		rl.pause();
 		try {
-			return await confirmViaDialog(summary, pattern);
+			return await confirmViaDialog(req);
 		} finally {
 			rl.resume();
 		}

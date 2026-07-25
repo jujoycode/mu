@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type AskDecision, createGate, loadPolicy } from "../src/gate.ts";
+import { HostRegistry } from "../src/remote/hosts.ts";
 import type { ToolCall } from "../src/types.ts";
 
 let dir: string;
@@ -104,5 +105,109 @@ describe("permission gate", () => {
 		expect((await gate(bashCall("cat .env"))).allow).toBe(false);
 		expect((await gate(bashCall("git push origin main"))).allow).toBe(true);
 		expect((await gate(bashCall("bun test"))).allow).toBe(true);
+	});
+});
+
+describe("remote_exec gate (env → level)", () => {
+	const hosts = new HostRegistry([
+		{ alias: "api-dev", purpose: "dev", env: "dev" },
+		{ alias: "api-stg", purpose: "staging", env: "staging" },
+		{ alias: "api-prod", purpose: "prod", env: "prod" },
+	]);
+	const remoteCall = (host: string, command = "uptime"): ToolCall => ({
+		type: "toolCall",
+		id: "r1",
+		name: "remote_exec",
+		arguments: { host, command },
+	});
+
+	test("dev → 자동 실행 (confirm 없이)", async () => {
+		let asked = 0;
+		const gate = createGate({
+			policy,
+			interactive: true,
+			hosts,
+			auditPath: join(dir, "a.jsonl"),
+			confirm: async () => {
+				asked++;
+				return "once";
+			},
+		});
+		expect((await gate(remoteCall("api-dev"))).allow).toBe(true);
+		expect(asked).toBe(0);
+	});
+
+	test("staging → ask, 세션 허용은 같은 호스트에서 재사용", async () => {
+		let asked = 0;
+		const gate = createGate({
+			policy,
+			interactive: true,
+			hosts,
+			auditPath: join(dir, "a.jsonl"),
+			confirm: async () => {
+				asked++;
+				return "session";
+			},
+		});
+		expect((await gate(remoteCall("api-stg"))).allow).toBe(true);
+		expect((await gate(remoteCall("api-stg", "ls"))).allow).toBe(true);
+		expect(asked).toBe(1); // 두 번째는 세션 캐시
+	});
+
+	test("prod → 매번 명시 승인 (session도 캐시 안 함)", async () => {
+		let asked = 0;
+		const gate = createGate({
+			policy,
+			interactive: true,
+			hosts,
+			auditPath: join(dir, "a.jsonl"),
+			confirm: async () => {
+				asked++;
+				return "session"; // prod는 session이어도 캐시하지 않아야 함
+			},
+		});
+		expect((await gate(remoteCall("api-prod"))).allow).toBe(true);
+		expect((await gate(remoteCall("api-prod", "ls"))).allow).toBe(true);
+		expect(asked).toBe(2); // 매번 물어봄
+	});
+
+	test("prod confirm 요청은 focusNo + allowSession=false", async () => {
+		let seen: { focusNo?: boolean; allowSession?: boolean } = {};
+		const gate = createGate({
+			policy,
+			interactive: true,
+			hosts,
+			auditPath: join(dir, "a.jsonl"),
+			confirm: async (req) => {
+				seen = { focusNo: req.focusNo, allowSession: req.allowSession };
+				return "deny";
+			},
+		});
+		await gate(remoteCall("api-prod"));
+		expect(seen.focusNo).toBe(true);
+		expect(seen.allowSession).toBe(false);
+	});
+
+	test("미등록 별칭 → deny (알려진 별칭 목록 포함)", async () => {
+		const gate = createGate({ policy, interactive: true, hosts, auditPath: join(dir, "a.jsonl") });
+		const v = await gate(remoteCall("nope"));
+		expect(v.allow).toBe(false);
+		expect(v.reason).toContain("Unknown host");
+		expect(v.reason).toContain("api-dev");
+	});
+
+	test("staging 비대화형 → 자동 차단", async () => {
+		const gate = createGate({ policy, interactive: false, hosts, auditPath: join(dir, "a.jsonl") });
+		expect((await gate(remoteCall("api-stg"))).allow).toBe(false);
+	});
+
+	test("감사 로그에 host·env 기록", async () => {
+		const auditPath = join(dir, "remote-audit.jsonl");
+		const gate = createGate({ policy, interactive: true, hosts, auditPath, confirm: async () => "deny" });
+		await gate(remoteCall("api-dev"));
+		await gate(remoteCall("api-prod"));
+		const entries = readFileSync(auditPath, "utf-8").trim().split("\n").map((l) => JSON.parse(l));
+		expect(entries[0]).toMatchObject({ tool: "remote_exec", host: "api-dev", env: "dev", verdict: "allow" });
+		expect(entries[1]).toMatchObject({ tool: "remote_exec", host: "api-prod", env: "prod", verdict: "ask", decision: "deny" });
 	});
 });

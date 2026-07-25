@@ -24,10 +24,14 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 - ✅ 재시도·에러 처리 (llm.ts: 지수 백오프 + retry-after + abortable, MAX_RETRIES=3)
   · ✅ 토큰/비용 추적 (src/utils/cost.ts: 모델별 단가 + 캐시 회계, 턴/세션 요약)
 - ✅ 브랜드 감성: 스피너 글리프 + 랜덤 멘트, 웰컴 배너 마스코트 (설계: docs/09)
-- **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김 ← 다음
+- ✅ **`remote_exec` 툴** — 호스트 레지스트리(hosts.json) + env→레벨 게이트
+  (dev allow / staging ask / prod 명시 승인) + 감사 로그 (구현: src/remote, src/tools/remoteExec.ts)
 
 > 조정 이력: remote_exec P2 → P1.
 > 이유: 매일 아픈 페인포인트라 초기 체감 가치가 가장 큼.
+>
+> P1 코드 항목은 모두 구현 완료. P1→P2 게이트("remote_exec로 dev 서버 작업 1건 완수 +
+> 세션 재개")의 실환경 검증은 실제 호스트가 있는 환경에서 남음.
 
 ## P2 — 스킬 시스템 (본체)
 
