@@ -18,10 +18,13 @@ import { type AskAnswer, type ConfirmRequest, createGate, loadPolicy } from "./g
 import { loadHosts } from "./remote/hosts.ts";
 import { SessionStore } from "./session.ts";
 import { loadSkills } from "./skills/registry.ts";
+import { createBashTool } from "./tools/bash.ts";
 import { createCoreTools } from "./tools/index.ts";
 import { createLoadSkillTool } from "./tools/loadSkill.ts";
+import { createReadTool } from "./tools/read.ts";
 import { createRemoteExecTool } from "./tools/remoteExec.ts";
 import { createSearchKnowledgeTool } from "./tools/searchKnowledge.ts";
+import { createSubagentTool } from "./tools/subagent.ts";
 import type { AgentEvent, ToolCall } from "./types.ts";
 
 const MODEL = process.env.MU_MODEL ?? "claude-sonnet-5";
@@ -158,15 +161,35 @@ async function main(): Promise<void> {
 
 	const spin = makeSpinnerController();
 	const cost = new CostTracker();
+	const systemPrompt = loadSystemPrompt(skills.summaryBlock());
+
+	// 서브에이전트 (docs/07, 코어 비침습): 격리 컨텍스트의 조사용 하위 에이전트.
+	// 툴은 읽기 중심(read/bash/skill/knowledge) — 쓰기·원격·재귀는 주지 않는다.
+	// 게이트는 비대화형(ask=자동 차단)이라 위험 명령은 확인 없이 막힌다.
+	const subagentTool = createSubagentTool({
+		model: MODEL,
+		systemPrompt,
+		tools: [
+			createReadTool(process.cwd()),
+			createBashTool(process.cwd()),
+			createLoadSkillTool(skills),
+			createSearchKnowledgeTool(process.cwd()),
+		],
+		beforeToolCall: createGate({ policy: loadPolicy(), interactive: false, hosts }),
+		onProgress: (line) => console.log(dim(`    ${line}`)),
+		onUsage: (m, usage) => cost.add(m, usage),
+	});
+
 	const agent = new Agent(
 		{
 			model: MODEL,
-			systemPrompt: loadSystemPrompt(skills.summaryBlock()),
+			systemPrompt,
 			tools: [
 				...createCoreTools(process.cwd()),
 				createRemoteExecTool(hosts),
 				createLoadSkillTool(skills),
 				createSearchKnowledgeTool(process.cwd()),
+				subagentTool,
 			],
 			onEvent: makeOnEvent(spin, cost, MODEL),
 			onMessage: (message) => session.append(message),
