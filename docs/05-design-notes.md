@@ -43,19 +43,31 @@ pi에는 권한 시스템이 없다 (컨테이너 위임) — 이것이 mu 고�
 
 - 원격 명령뿐 아니라 **ask/deny 판정과 사용자 결정도 기록** (`시각/툴/명령/판정/결과`)
 
-## remote_exec (P1)
+## remote_exec (P1) — 구현 완료
 
-### hosts.yaml — 호스트 레지스트리
+> 구현: `src/remote/hosts.ts`(레지스트리) + `src/tools/remoteExec.ts`(툴) +
+> `gate.ts`의 env→레벨 판정. 레지스트리 파일 포맷은 **JSON(`hosts.json`)** 로 결정
+> (policy.json·config.json과 일관, YAML 의존성 회피 — 미니멀 원칙).
 
-```yaml
-hosts:
-  - alias: api-dev
-    purpose: "API 개발 서버"
-    env: dev          # dev | staging | prod
-  - alias: api-prod
-    purpose: "API 프로덕션"
-    env: prod
+### hosts.json — 호스트 레지스트리
+
+```json
+{
+  "hosts": [
+    { "alias": "api-dev",  "purpose": "API 개발 서버", "env": "dev" },
+    { "alias": "api-prod", "purpose": "API 프로덕션",   "env": "prod",
+      "ssh": "prod.example.internal" }
+  ]
+}
 ```
+
+- `env`: `dev | staging | prod` — 권한 레벨을 결정 (아래 매핑).
+- `ssh`(선택): 실제 `ssh`에 넘길 호스트(~/.ssh/config의 Host). 생략 시 `alias` 사용 —
+  별칭과 ssh 호스트를 분리하고 싶을 때만.
+- 기본 = 레포 `hosts.json`, 사용자 추가 = `~/.mu/hosts.json` (별칭 기준 병합, 사용자 우선).
+- 실행은 `ssh -o BatchMode=yes -- <sshHost> <command>` 셸아웃 — ProxyJump·agent
+  forwarding을 ~/.ssh/config에서 상속. dev는 세션 캐시 없이 자동, staging은 호스트별
+  세션 허용, **prod는 매번 명시 승인**(세션 캐시 없음, 기본 포커스 '아니오').
 
 ### 원칙
 

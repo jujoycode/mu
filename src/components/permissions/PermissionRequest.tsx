@@ -20,6 +20,8 @@ export interface AskRequest {
 	pattern: string;
 	/** true면 기본 포커스를 '아니오'에 (docs/07: prod 대상 등) */
 	focusNo?: boolean;
+	/** false면 '세션 동안 묻지 않기' 옵션을 숨긴다 (prod = 매번 명시 승인, docs/05) */
+	allowSession?: boolean;
 }
 
 export interface AskResult {
@@ -49,6 +51,7 @@ function AskApp({
 	const [yesFeedback, setYesFeedback] = useState("");
 	const [noFeedback, setNoFeedback] = useState("");
 
+	const showSession = request.allowSession !== false;
 	const options: SelectOption<OptionValue>[] = [
 		yesMode
 			? {
@@ -60,11 +63,15 @@ function AskApp({
 					onEdit: setYesFeedback,
 				}
 			: { value: "yes", label: "예" },
-		{
-			value: "yes-session",
-			label: "예, 이 세션에선 묻지 않기",
-			description: `패턴: ${request.pattern}`,
-		},
+		...(showSession
+			? [
+					{
+						value: "yes-session" as const,
+						label: "예, 이 세션에선 묻지 않기",
+						description: `패턴: ${request.pattern}`,
+					},
+				]
+			: []),
 		noMode
 			? {
 					kind: "input",
