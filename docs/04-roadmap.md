@@ -19,7 +19,8 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 - ✅ 세션 저장/재개 — 선형 JSONL append (docs/06 결정 4), `mu -c`로 재개
 - ✅ bash 안전장치 — allow/ask/deny 권한 게이트 + 감사 로그 (설계: docs/05,
   정책: policy.json + ~/.mu/policy.json add-only 병합)
-- TUI 코어 이식 + ask 프롬프트 UI (설계: docs/07)
+- TUI: Ink 도입 + Claude Code 스타일 ask 프롬프트 UI (설계: docs/08, docs/07 일부 개정)
+  + 게이트 Decision/Update 모델 개정 (docs/08 PART 1)
 - 재시도·에러 처리, 토큰/비용 추적
 - **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김
 

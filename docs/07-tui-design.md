@@ -3,6 +3,11 @@
 > 방향: pi의 비주얼 아이덴티티를 채택하되, 특히 **question(ask 프롬프트)**과
 > **서브에이전트 진행 표시** 두 UI 표면을 잘 만든다.
 > 근거 분석: docs/06 · pi 파일 경로는 `packages/tui`, `packages/coding-agent` 기준.
+>
+> ⚠️ 개정 (2026-07-25, docs/08): 렌더링 스택은 자체 이식 대신 **Ink 도입**으로 변경,
+> ask 프롬프트는 **Claude Code 스타일**로 결정. 아래 "TUI 코어 이식" 및
+> "Question / ask 프롬프트" 절은 docs/08이 대체한다. 비주얼 문법(카드/diff/footer)과
+> 서브에이전트 표시 관용구는 계속 유효.
 
 ## 채택 범위
 
