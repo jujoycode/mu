@@ -17,13 +17,17 @@ import { CostTracker, computeCost, formatCost, formatTokens, totalTokens } from 
 import { type AskAnswer, type ConfirmRequest, createGate, loadPolicy } from "./gate.ts";
 import { loadHosts } from "./remote/hosts.ts";
 import { SessionStore } from "./session.ts";
+import { loadSkills } from "./skills/registry.ts";
 import { createCoreTools } from "./tools/index.ts";
+import { createLoadSkillTool } from "./tools/loadSkill.ts";
 import { createRemoteExecTool } from "./tools/remoteExec.ts";
+import { createSearchKnowledgeTool } from "./tools/searchKnowledge.ts";
 import type { AgentEvent, ToolCall } from "./types.ts";
 
 const MODEL = process.env.MU_MODEL ?? "claude-sonnet-5";
 
-function loadSystemPrompt(): string {
+// skillsBlock: 스킬 요약(lazy) 주입. 프롬프트 하드코딩이 아니라 런타임 데이터라 코드에서 조립한다.
+function loadSystemPrompt(skillsBlock: string): string {
 	// MU.md — mu 런타임이 소비하는 시스템 프롬프트 (개발용 CLAUDE.md와 다른 파일)
 	const path = new URL("../MU.md", import.meta.url).pathname;
 	if (!existsSync(path)) {
@@ -31,7 +35,8 @@ function loadSystemPrompt(): string {
 		process.exit(1);
 	}
 	const base = readFileSync(path, "utf-8").trim();
-	return `${base}\n\nCurrent working directory: ${process.cwd()}\nPlatform: ${process.platform}`;
+	const skills = skillsBlock ? `\n\n${skillsBlock}` : "";
+	return `${base}${skills}\n\nCurrent working directory: ${process.cwd()}\nPlatform: ${process.platform}`;
 }
 
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -142,6 +147,7 @@ async function main(): Promise<void> {
 	// 권한 게이트 — REPL에서만 대화형 confirm이 연결된다.
 	// Ink 다이얼로그가 stdin을 잡는 동안 readline을 잠시 멈춘다 (stdin 경합 방지).
 	const hosts = loadHosts();
+	const skills = loadSkills(process.cwd());
 	let confirmImpl: ((req: ConfirmRequest) => Promise<AskAnswer>) | undefined;
 	const gate = createGate({
 		policy: loadPolicy(),
@@ -155,8 +161,13 @@ async function main(): Promise<void> {
 	const agent = new Agent(
 		{
 			model: MODEL,
-			systemPrompt: loadSystemPrompt(),
-			tools: [...createCoreTools(process.cwd()), createRemoteExecTool(hosts)],
+			systemPrompt: loadSystemPrompt(skills.summaryBlock()),
+			tools: [
+				...createCoreTools(process.cwd()),
+				createRemoteExecTool(hosts),
+				createLoadSkillTool(skills),
+				createSearchKnowledgeTool(process.cwd()),
+			],
 			onEvent: makeOnEvent(spin, cost, MODEL),
 			onMessage: (message) => session.append(message),
 			beforeToolCall: gate,

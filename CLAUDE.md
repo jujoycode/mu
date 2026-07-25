@@ -20,6 +20,8 @@
 - `src/gate.ts` + `policy.json` — allow/ask/deny 권한 게이트. 정책은 설정 파일에 (코드 금지)
 - `src/remote/` + `src/tools/remoteExec.ts` + `hosts.json` — remote_exec. 모델은 별칭만 본다.
   env(dev/staging/prod)→레벨은 gate.ts가 판정. SSH 인증은 로컬 ssh-agent + ~/.ssh/config (설계: docs/05)
+- `src/skills/` + `src/tools/{loadSkill,searchKnowledge}.ts` — 스킬 시스템. lazy loading:
+  요약만 상주, 본문은 load_skill로 온디맨드. 스킬 = `.mu/skills/`·`~/.mu/skills/`의 폴더 (설계: docs/05)
 - `src/components/`, `src/utils/`, `src/constants/` — TUI(Ink). **폴더 구조는 Claude Code와 동일**하게 간다
   (`components/permissions/` ask UI, `components/CustomSelect/`, `components/Spinner.tsx`,
   `components/LogoV2/` 마스코트·웰컴, `utils/theme.ts`). 설계: docs/08·09
