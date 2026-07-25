@@ -22,6 +22,7 @@ mu가 사람 개입 없이 diff까지 뽑아내면 클리어.
 - TUI: Ink 도입 + Claude Code 스타일 ask 프롬프트 UI (설계: docs/08, docs/07 일부 개정)
   + 게이트 Decision/Update 모델 개정 (docs/08 PART 1)
 - 재시도·에러 처리, 토큰/비용 추적
+- 브랜드 감성: 스피너 글리프 + 랜덤 멘트, 웰컴 배너 마스코트 (설계: docs/09)
 - **`remote_exec` 툴** (설계: docs/05) — 원래 P2였으나 앞당김
 
 > 조정 이력: remote_exec P2 → P1.

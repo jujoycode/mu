@@ -218,10 +218,14 @@ agent 루프:
 `askUser`는 Promise 반환 — 다이얼로그가 입력 에디터 자리를 교체하고, 완료 후 복귀
 (docs/07의 selector 패턴과 동일한 흐름을 Ink로).
 
-## 2.7 단계 배치 갱신
+---
 
-| 단계 | 작업 |
-|------|------|
-| P1 (다음) | Ink 도입 + Select/ListItem/Dialog/Prompt + gate.ts Decision 개정 + `addRules` 저장 + Tab 피드백 |
-| P1 후반 | remote_exec 다이얼로그(기본 포커스 `아니오`), REPL 본체 Ink 이전, footer |
-| P2 | 서브에이전트 진행 표시, 마크다운 렌더링 (docs/07 관용구 유지) |
+# PART 3 — 브랜드 표면: 마스코트 + 스피너 (구조 채택, 디자인은 mu 오리지널)
+
+Claude Code의 "성격"을 만드는 두 요소. 구조와 애니메이션 기법은 따라가되,
+**캐릭터 디자인과 멘트 목록은 mu 오리지널로 만든다** (이 둘이야말로 브랜드 그 자체라
+복제하면 안 되는 영역이고, 바꿔야 재미가 산다).
+
+## 3.1 마스코트 — Clawd 분석
+
+Claude Code의 시그니처
