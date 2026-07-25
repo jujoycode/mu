@@ -39,7 +39,8 @@
 > 교체·추가가 쉬워야 하고, 여러 마스코트를 바꿔가며 쓸 수 있어야 한다 (팀 취향
 > 반영 + 도그푸딩 때 후보 추가 실험).
 
-구현 (`src/tui/mascot.ts` — 순수 데이터, Ink 비의존):
+구현 (`src/components/LogoV2/mascot.ts` — 순수 데이터, Ink 비의존.
+경로는 Claude Code 구조와 동일하게 `LogoV2/`):
 - `Mascot` = `{ name, width, height, poses, animations }`.
   포즈는 고정 크기 행 문자열 배열, 애니메이션은 `{pose, offset}[]` 프레임 시퀀스
   (`hold()` 헬퍼, 재생 간격 60ms는 렌더러 몫) — Clawd의 세그먼트/Frame 구조 채택.
@@ -93,11 +94,13 @@ docs/07 footer 규약과 통합.
   `~/.mu/config.json`의 `spinnerVerbs: { mode: 'append', verbs: [...] }`.
   개인이 자기 멘트를 얹을 수 있게 (애착 포인트).
 
-**구조**:
-- `src/tui/spinner/verbs.ts` — 멘트 배열 + `getSpinnerVerbs()`(설정 병합)
-- `src/tui/spinner/Spinner.tsx` — 글리프 프레임 + 마운트 시 `sample` 1회 고정 +
-  `동사…` 렌더. stall(빨강 보간)·경과시간 부가정보는 P1 후반, thinking shimmer는 P2.
-- reduced-motion 폴백(깜빡이는 점)은 접근성 위해 P1에 포함.
+**구조** (경로는 Claude Code와 동일):
+- `src/constants/spinnerVerbs.ts` — 멘트 배열 + `getSpinnerVerbs()`(설정 병합) + `pickVerb()`
+- `src/components/Spinner.tsx` — 글리프 6프레임 왕복 + 대기 구간마다 멘트 1회 픽 +
+  `동사…` 렌더. 경과시간(3초부터 `(Ns)`)·reduced-motion 폴백(깜빡이는 점) 포함.
+  REPL이 아직 readline이라 경량 ANSI 라인으로 구현(순수 함수 `spinnerLine`은 테스트됨);
+  Ink 풀 REPL 전환 시 컴포넌트로 교체. stall(빨강 보간)은 P1 후반, thinking shimmer는 P2.
+- 웰컴 배너는 `src/components/LogoV2/Welcome.ts` — 마스코트 greet 애니메이션 + 세션 정보.
 
 ## 2.3 단계 배치
 

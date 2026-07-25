@@ -117,17 +117,20 @@ plan 모드·acceptEdits는 mu 로드맵에 없음. 비대화형(`-p`)에서 ask
 
 ## 2.1 레이어링 (5층 구조 그대로 채택)
 
-| 층 | Claude Code | mu 파일 | 역할 |
-|----|-------------|---------|------|
-| 라우터 | `PermissionRequest` | `src/tui/ask/index.tsx` | 툴 종류 → 전용 다이얼로그 (bash / remote_exec / fallback) |
-| 프레임 | `PermissionDialog` + `Title` | `src/tui/ask/Dialog.tsx` | 상단 보더 + 제목 + 부제목 |
-| 질문+옵션 | `PermissionPrompt` | `src/tui/ask/Prompt.tsx` | 질문 문구, 옵션 변환, Tab 피드백 상태 |
-| 리스트 | `Select` (CustomSelect) | `src/tui/Select.tsx` | 키 내비게이션, input형 옵션 지원 |
-| 행 | `ListItem` | `src/tui/ListItem.tsx` | `❯`/`✓`/`↑↓` 인디케이터 + 상태색 |
+폴더 구조도 Claude Code와 동일하게 간다 (결정 2026-07-25):
 
-라우터를 포함해 **계층을 그대로 유지**한다 (P1은 bash + fallback 2종으로 시작,
-P1 후반 remote_exec 추가). Select/ListItem은 ask 전용이 아닌 범용 컴포넌트로 두어
-이후 REPL의 다른 선택 UI(모델 선택 등)에서 재사용.
+| 층 | Claude Code | mu 파일 (동일 구조) | 역할 |
+|----|-------------|---------|------|
+| 진입 | `PermissionRequest` | `src/components/permissions/PermissionRequest.tsx` | `askUser()` + AskApp (P1은 bash/fallback 공용, 툴별 분기는 이후) |
+| 프레임 | `PermissionDialog` | `src/components/permissions/PermissionDialog.tsx` | 상단 보더 + 제목 + 부제목 |
+| 리스트 | `Select` (CustomSelect) | `src/components/CustomSelect/select.tsx` | 키 내비게이션, input형 옵션 지원 |
+| 행 | `ListItem` | `src/components/design-system/ListItem.tsx` | `❯`/`✓`/`↑↓` 인디케이터 + 상태색 |
+| 색 | `theme` | `src/utils/theme.ts` | 토큰 + ANSI 헬퍼 |
+
+Select/ListItem은 ask 전용이 아닌 범용 컴포넌트로 두어 이후 REPL의 다른 선택
+UI(모델 선택 등)에서 재사용. P1은 단일 AskApp(질문+옵션+Tab 피드백을 한 컴포넌트에)
+으로 시작하고, 툴별 전용 다이얼로그 분기(Claude Code의 `permissionComponentForTool`)는
+remote_exec 추가 시점에 나눈다.
 
 ## 2.2 비주얼 문법
 

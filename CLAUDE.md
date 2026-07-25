@@ -18,6 +18,9 @@
 - `src/tools/` — 툴 구현. 인터페이스는 `{ name, description, inputSchema, execute }`로 고정
 - `src/session.ts` — 세션 저장 (선형 JSONL append, `~/.mu/sessions/`)
 - `src/gate.ts` + `policy.json` — allow/ask/deny 권한 게이트. 정책은 설정 파일에 (코드 금지)
+- `src/components/`, `src/utils/`, `src/constants/` — TUI(Ink). **폴더 구조는 Claude Code와 동일**하게 간다
+  (`components/permissions/` ask UI, `components/CustomSelect/`, `components/Spinner.tsx`,
+  `components/LogoV2/` 마스코트·웰컴, `utils/theme.ts`). 설계: docs/08·09
 - `MU.md` — **mu 런타임이 소비하는 시스템 프롬프트.** 이 CLAUDE.md와 다른 파일이니 혼동 금지
 
 ## 절대 규칙
