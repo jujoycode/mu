@@ -1,0 +1,22 @@
+{
+  "name": "@team/mu",
+  "version": "0.0.1",
+  "description": "팀 내부용 미니멀 코딩 에이전트 harness",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "mu": "src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.114.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}

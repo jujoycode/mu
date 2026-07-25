@@ -1,0 +1,20 @@
+{
+  "bash": {
+    "ask": [
+      "\\brm\\s+-[a-zA-Z]*r",
+      "\\bsudo\\b",
+      "git\\s+push\\s+[^&|;]*(--force|-f\\b)",
+      "\\bdd\\s+if=",
+      "\\bchmod\\s+-[a-zA-Z]*R",
+      "\\bchown\\s+-[a-zA-Z]*R",
+      "curl\\s[^|;&]*\\|\\s*(ba|z)?sh",
+      "wget\\s[^|;&]*\\|\\s*(ba|z)?sh",
+      "\\bmkfs\\b",
+      ">\\s*/dev/sd"
+    ],
+    "deny": [
+      "\\.ssh/id_[a-zA-Z0-9_]*",
+      "(cat|less|head|tail|more|grep|bat)\\s+(-\\S+\\s+)*\\S*\\.env\\b"
+    ]
+  }
+}
