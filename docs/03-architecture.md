@@ -7,15 +7,27 @@ mu/
 ├─ package.json    # bin: { "mu": "src/cli.ts" }
 ├─ CLAUDE.md       # mu를 "개발할 때" Claude Code가 읽는 파일
 ├─ MU.md           # mu "런타임이" 소비하는 시스템 프롬프트 (코드 밖!)
+├─ policy.json     # 권한 게이트 정책 (bash ask/deny 패턴)
+├─ hosts.json      # remote_exec 호스트 레지스트리 (별칭·env)
+├─ .github/workflows/ci.yml   # CI: push/PR마다 tsc + test
+├─ .mu/skills/     # 프로젝트 스킬 (예: mu-dev)
 └─ src/
-   ├─ cli.ts       # 진입점, REPL
-   ├─ agent.ts     # 코어 루프 — 심장, ~150줄 유지 목표
-   ├─ llm.ts       # Anthropic 스트리밍 래퍼
+   ├─ cli.ts       # 진입점, REPL, 툴·게이트·스킬 조립
+   ├─ agent.ts     # 코어 루프 — 심장, ~150줄 유지 목표 (현재 113줄)
+   ├─ llm.ts       # Anthropic 스트리밍 래퍼 (자체 SSE + 재시도)
    ├─ types.ts     # Message, Tool 인터페이스
-   └─ tools/
-      ├─ index.ts  # 툴 레지스트리
-      └─ read.ts / write.ts / edit.ts / bash.ts
+   ├─ gate.ts      # 권한 게이트 (bash + remote_exec 판정)
+   ├─ session.ts   # 세션 저장/재개 (JSONL append)
+   ├─ remote/      # 호스트 레지스트리
+   ├─ skills/      # 스킬 탐색 + lazy 요약
+   ├─ tools/       # read/write/edit/bash + remoteExec/loadSkill/searchKnowledge/subagent
+   ├─ components/  # TUI (Ink) — 폴더 구조는 Claude Code와 동일
+   ├─ utils/       # theme, cost
+   └─ constants/   # spinnerVerbs
 ```
+
+> 확장(remote_exec·스킬·서브에이전트·TUI)은 전부 코어(agent.ts) 밖에 얹혔다.
+> 코어 루프는 P0 이후로 커지지 않았다 — 이것이 "확장으로 얹는다"는 설계의 증거.
 
 > ⚠️ **MU.md ≠ CLAUDE.md.** MU.md는 mu가 실행될 때 읽는 시스템 프롬프트,
 > CLAUDE.md는 mu를 개발하는 Claude Code 세션용. 혼동 금지.
